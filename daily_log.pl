@@ -56,13 +56,14 @@ my $furl = Furl->new(
 );
 
 
-#my $consumption   = get_consumption();
-#my $generated     = get_generation();
-generate_graph();
-exit 0;
-my ($consumption, $generated);
+my $consumption   = get_consumption();
+my $generated     = get_generation();
+
 my $status_string = generate_status_string( $generated, $consumption );
 say $status_string;
+
+generate_graph();
+
 if ( -e $date_8601 . '.png' ) {
   $nt->update_with_media( $status_string, [ $date_8601 . '.png' ] );
 }
