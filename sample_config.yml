@@ -1,0 +1,8 @@
+---
+db_path:          energy.db
+consumer_key:     abc123
+consumer_secret:  abc123
+token:            abc123
+token_secret:     abc123
+time_zone:        America/New_York
+ted_url:          http://192.172.242.60
