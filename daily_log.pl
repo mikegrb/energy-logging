@@ -50,7 +50,7 @@ my $dbh = DBI->connect('dbi:SQLite:dbname=' . $config->{db_path}) or die;
 my $furl = Furl->new(
   timeout         => 300,
   capture_request => 1,
-#  ssl_opts        => { SSL_ca_path => '/etc/ssl/certs' },
+  ssl_opts        => { SSL_ca_path => '/etc/ssl/certs' },
   agent =>
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36',
 );
@@ -74,7 +74,9 @@ else {
 
 sub generate_graph {
   my $cc = Chart::Clicker->new(width => 900, height => 400, format => 'png');
-  $cc->color_allocator->seed_hue(180);;
+  $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#4daf4a') );
+  $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#e41a1c') );
+  $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#377eb8') );
 
   my %serieses;
   for my $series (qw{ net solar consumption } ) {
@@ -96,15 +98,16 @@ sub generate_graph {
     $row->{time} =~ s/:00$//;
     push @ticks,       $tick;
     push @tick_labels, $row->{time};
-    $serieses{$_}->add_pair( $tick, $row->{$_} / 1000 ) for (qw(net solar consumption));
+    $serieses{$_}->add_pair( $tick, $row->{$_} / 1000 ) for (qw(solar consumption net));
   }
 
-  my $ds = Chart::Clicker::Data::DataSet->new( series => [ values %serieses ] );
+  my $ds = Chart::Clicker::Data::DataSet->new( series => [ @serieses{qw(solar consumption net)} ] );
   $cc->add_to_datasets( $ds );
 
   my $ctx = $cc->get_context('default');
   $ctx->range_axis->label('kWh');
   $ctx->range_axis->fudge_amount( .10 );
+  $ctx->range_axis->label_font->size(16);
   $ctx->add_marker( Chart::Clicker::Data::Marker->new( value => 0 ) );
 
 
@@ -113,8 +116,11 @@ sub generate_graph {
   $axis->tick_values( \@ticks );
   $axis->tick_labels( \@tick_labels );
   $axis->staggered( 1 );
+  $axis->label_font->size(16);
 
+  $cc->legend->font->size(18);
   $cc->title->text( "Energy Consumption for $date_8601" );
+  $cc->title->font->size(20);
   $cc->title->padding->bottom(5);
   $cc->write_output( $date_8601 . '.png' );
 }
@@ -186,7 +192,7 @@ sub get_generation {
 
 sub generate_status_string {
   my ($generated, $consumed) = @_;
-  my $net = $consumed - $generated;
+  my $net = sprintf('%.2f', $consumed - $generated);
   return "Yesterday, Solar: $generated kWh Consumed: $consumed kWh Grid: $net kWh";
 }
 
