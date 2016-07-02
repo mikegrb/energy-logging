@@ -27,13 +27,15 @@ my $DEBUG = 1;
 my $dbh = DBI->connect('dbi:SQLite:dbname=' . $config->{db_path}) or die;
 
 my $date     = DateTime->today( time_zone => $config->{time_zone} )->subtract( days => 1 );
+say $date->strftime('%F');
 my $title    = $date->strftime('%B %Y');
 my $filename = $date->strftime('%Y-%m');
 
 my $sth = $dbh->prepare(q{
   SELECT strftime('%s',`date`) AS `date`,
-    SUM(`solar`) AS `solar`,
-    SUM(`consumption`) AS `consumption`
+    SUM(`solar`)       AS `solar`,
+    SUM(`consumption`) AS `consumption`,
+    SUM(`clouds`)      AS `clouds`
   FROM `history`
   WHERE `date` BETWEEN
     DATE('now','localtime','-1 day', 'start of month')
@@ -67,7 +69,7 @@ while ( my $row = $sth->fetchrow_hashref ) {
   }
   say join( "\t", $row->{date}, $row->{solar}, $row->{consumption}, $net, $deficit, $surplus, $solar );
 
-  push @data, [ $row->{date}, $solar, $row->{consumption}, $net, $deficit, $surplus ];
+  push @data, [ $row->{date}, $solar, $row->{consumption}, $net, $deficit, $surplus, $row->{clouds} ];
 }
 
 my $month_net = sprintf('%.2f', $month_solar - $month_consumption);
@@ -77,35 +79,34 @@ generate_graph();
 
 sub generate_graph {
   my $cc = Chart::Clicker->new(width => 900, height => 400, format => 'png');
-  $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#4daf4a') );
   $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#377eb8') );
+  $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#4daf4a') );
   $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#e41a1c') );
 
   my %serieses;
-  my %name_for = ( solar => 'Solar Consumed', surplus => 'Excess Solar', deficit => 'Grid Consumed' );
-  for my $series (qw{ solar deficit surplus } ) {
+  my %name_for = ( solar => 'Consumption from Solar', surplus => 'Excess Solar', deficit => 'Consumption from Grid', clouds => '% Cloud Cover' );
+  for my $series (qw{ solar deficit surplus clouds } ) {
     $serieses{ $series } = Chart::Clicker::Data::Series->new( name => $name_for{$series} );
   }
 
   say "Graph Data:";
   my (@ticks, @tick_labels);
   for my $row (@data) {
-    say join ("\t", @{$row}[0,1,4,5]);
+    say join ("\t", @{$row}[0,1,4,5, 6]);
     push @ticks, $row->[0];
-    push @tick_labels, strftime('%m/%d', localtime $row->[0]);
+    push @tick_labels, strftime('%m/%d', gmtime $row->[0]);
     $serieses{solar}->add_pair( $row->[0], $row->[1] );
     $serieses{deficit}->add_pair( $row->[0], $row->[4] );
     $serieses{surplus}->add_pair( $row->[0], $row->[5] );
+    #$serieses{clouds}->add_pair(  $row->[0], $row->[6] );
   }
 
-  my $ds = Chart::Clicker::Data::DataSet->new( series => [ $serieses{surplus}, $serieses{solar}, $serieses{deficit} ] );
-
+  my $ds = Chart::Clicker::Data::DataSet->new( series => [ $serieses{solar}, $serieses{surplus}, $serieses{deficit} ] );
   $cc->add_to_datasets( $ds );
 
   my $ctx = $cc->get_context('default');
   $ctx->range_axis->label('kWh');
-  #$ctx->range_axis->fudge_amount( );
-  #$ctx->add_marker( Chart::Clicker::Data::Marker->new( value => 0 ) );
+  $ctx->range_axis->label_font->size(16);
   $ctx->renderer( Chart::Clicker::Renderer::StackedBar->new(opacity => .6) );
 
   my $daxis = $ctx->domain_axis;
@@ -113,7 +114,14 @@ sub generate_graph {
   $daxis->staggered(1);
   $daxis->tick_values( \@ticks );
   $daxis->tick_labels( \@tick_labels );
+  $daxis->label_font->size(16);
 
+  #my $ds_clouds = Chart::Clicker::Data::DataSet->new( series => [ $serieses{clouds} ] );
+  #my $cctx = Chart::Clicker::Context->new(name => 'clouds');
+  #$cctx->renderer(Chart::Clicker::Renderer::Line->new);
+  #$ds_clouds->context( 'clouds' );
+  #$cc->add_to_contexts( $cctx );
+  #$cc->add_to_datasets( $ds_clouds );
 
   $cc->legend->font->size(18);
   $cc->title->text( "Energy for $title" );
