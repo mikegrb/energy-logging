@@ -27,6 +27,20 @@ system 'scp', 'graphs/'.$date_8601 . '.png', 'michael@thegrebs.com:public_html/s
 system 'scp', 'graphs/'.$date_8601 . '.png', 'michael@thegrebs.com:public_html/solar/latest_day.png';
 
 sub generate_graph {
+
+  my $sth = $dbh->prepare(q{
+    SELECT SUM(`solar`), SUM(`consumption`)
+    FROM history
+    WHERE `date` = ?
+  });
+  $sth->execute( $date_8601 );
+  my ($gen_total, $used_total) = $sth->fetchrow_array;
+  my %labels = (
+    net => "Net (" . ( $used_total - $gen_total ) / 1000 . " kWh)",
+    solar       => "Solar (" . $gen_total / 1000 . " kWh)",
+    consumption => "Consumption (" . $used_total / 1000 . " kWh)",
+  );
+
   my $cc = Chart::Clicker->new(width => 900, height => 400, format => 'png');
   $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#4daf4a') );
   $cc->color_allocator->add_to_colors( Graphics::Color::RGB->from_hex_string('#e41a1c') );
@@ -34,7 +48,7 @@ sub generate_graph {
 
   my %serieses;
   for my $series (qw{ net solar consumption } ) {
-    $serieses{ $series } = Chart::Clicker::Data::Series->new( name => ucfirst $series );
+    $serieses{$series} = Chart::Clicker::Data::Series->new( name => $labels{$series} );
   }
 
   my $sth = $dbh->prepare(q{
