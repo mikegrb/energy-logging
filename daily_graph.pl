@@ -36,9 +36,9 @@ sub generate_graph {
   $sth->execute( $date_8601 );
   my ($gen_total, $used_total) = $sth->fetchrow_array;
   my %labels = (
-    net => "Net (" . ( $used_total - $gen_total ) / 1000 . " kWh)",
-    solar       => "Solar (" . $gen_total / 1000 . " kWh)",
-    consumption => "Consumption (" . $used_total / 1000 . " kWh)",
+    net => "Net " . ( $used_total - $gen_total ) / 1000 . " kWh",
+    solar       => "Solar " . $gen_total / 1000 . " kWh",
+    consumption => "Consumption " . $used_total / 1000 . " kWh",
   );
 
   my $cc = Chart::Clicker->new(width => 900, height => 400, format => 'png');
