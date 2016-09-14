@@ -60,7 +60,7 @@ while ( my $row = $sth->fetchrow_hashref ) {
   push @data, [ $row->{date}, $solar, $row->{consumption}, $net, $deficit, $surplus ];
 }
 
-my $month_net = sprintf('%.2f', $month_solar - $month_consumption);
+my $month_net = sprintf('%.2f', $month_consumption -  $month_solar );
 my $sub_title = "Solar $month_solar kWh, Consumed $month_consumption kWh, Grid $month_net kWh";
 generate_graph();
 system 'scp', $filename, 'michael@thegrebs.com:public_html/solar';
@@ -74,6 +74,8 @@ sub generate_graph {
 
   my %serieses;
   my %name_for = ( solar => 'Consumption from Solar', surplus => 'Excess Solar', deficit => 'Consumption from Grid' );
+  $name_for{deficit} .= " $month_net kWh";
+
   for my $series (qw{ solar deficit surplus } ) {
     $serieses{ $series } = Chart::Clicker::Data::Series->new( name => $name_for{$series} );
   }
