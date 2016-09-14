@@ -31,9 +31,9 @@ my $sth = $dbh->prepare(q{
     SUM(`consumption`) AS `consumption`
   FROM `history`
   WHERE `date` BETWEEN
-    DATE('now','localtime','start of month')
+    DATE('now','localtime','-1 day','start of month')
     AND
-    DATE('now','localtime','start of month','+1 month','-1 day')
+    DATE('now','localtime','-1 day','start of month','+1 month','-1 day')
   GROUP BY `date`
   ORDER BY `date` ASC
 });
@@ -93,7 +93,12 @@ sub generate_graph {
   my $ctx = $cc->get_context('default');
   $ctx->range_axis->label('kWh');
   $ctx->range_axis->label_font->size(16);
-  $ctx->renderer( Chart::Clicker::Renderer::StackedBar->new(opacity => .6) );
+  $ctx->renderer(
+    Chart::Clicker::Renderer::StackedBar->new(
+      opacity     => .6,
+      bar_padding => 2,
+      bar_width   => 20
+    ) );
 
   my $daxis = $ctx->domain_axis;
   $daxis->label('Date');
