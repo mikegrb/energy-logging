@@ -13,7 +13,7 @@ use DateTime;
 use YAML::Tiny;
 use Data::Printer;
 
-my $DEBUG  = 0;
+my $DEBUG  = shift;
 my $config = YAML::Tiny->read('config.yml')->[0];
 my $ted    = $config->{ted_url};
 my $dbh    = DBI->connect( 'dbi:SQLite:dbname=' . $config->{db_path} ) or die;
@@ -28,6 +28,9 @@ my $furl = Furl->new(
 
 get_consumption();
 get_generation();
+$dbh->disconnect();
+system 'scp', 'energy.db', 'michael@thegrebs.com:energy/energy.db';
+
 
 sub furl_get {
   my $url = shift;
@@ -43,8 +46,12 @@ sub get_consumption {
   my $res = furl_get($history_url_hour);
   die "Didn't recognize returned data from TED" unless $res->content =~ /^"mtu/;
 
+
+  my $insert_date = $dbh->prepare(q{
+    INSERT OR IGNORE INTO `history` (`date`, `time`) VALUES (?, ?)
+  });
   my $log_row = $dbh->prepare(q{
-    INSERT OR IGNORE INTO `history` (`date`, `time`, `consumption`) VALUES (?, ?, ?)
+    UPDATE `history` SET `consumption` = ? WHERE  `date` = ? AND  `time` = ?
   });
 
   my @data = split /\n/, $res->content;
@@ -53,7 +60,9 @@ sub get_consumption {
   for my $row ( reverse @data ) {
     my ( $date_time, $power ) = ( split /,/, $row )[ 1, 2 ];
     my ( $date, $time ) = split ' ', $date_time;
-    $log_row->execute( convert_to_8601($date), $time, $power * 1000 );
+    $date = convert_to_8601($date);
+    $insert_date->execute( $date, $time );
+    $log_row->execute( $power * 1000, $date, $time );
   }
 
 }
@@ -70,6 +79,7 @@ sub get_generation {
   my $res = furl_get(
     "https://mysolarcity.com/solarcity-api/powerguide/v1.0/measurements/882c62ee-412e-467a-a5ba-f9d9390c2c51?EndTime=${end}&ID=31681080-05e0-4f52-825e-a548f4188426&IsByDevice=false&Period=Hour&StartTime=${start}",  );
 
+  print $res->content if $DEBUG > 2;
   my $data = decode_json( $res->content );
   my $log_row = $dbh->prepare(q{UPDATE `history` SET `solar` = ? WHERE `date` = ? AND `time` = ?});
 
